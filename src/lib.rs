@@ -82,6 +82,11 @@ impl MerkleClaim {
         let caller = env::predecessor_account_id();
 
         require!(
+            env::block_timestamp() > self.config.claim_end.into(),
+            "Claim period has not finished"
+        );
+
+        require!(
             caller == self.config.owner_account_id,
             "Caller must be the owner of the claims contract"
         );
