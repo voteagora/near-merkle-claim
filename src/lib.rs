@@ -2,8 +2,11 @@ mod config;
 mod merkle;
 
 use crate::config::Config;
-use near_sdk::{log, env, near, require, Promise, CryptoHash, BorshStorageKey, AccountId, PanicOnDefault};
-use near_sdk::store::{LookupSet, Vector};
+use near_sdk::store::LookupSet;
+use near_sdk::{
+    borsh, env, log, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken,
+    PanicOnDefault, Promise,
+};
 
 /// Raw type for balance in yocto NEAR.
 pub type Balance = u128;
@@ -12,6 +15,13 @@ pub type Balance = u128;
 #[near]
 enum StorageKeys {
     Claims,
+}
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
+#[near(serializers=[borsh])]
+struct MerkleTreeData {
+    account: String,
+    amount: Balance,
 }
 
 // Define the contract structure
@@ -24,7 +34,7 @@ pub struct MerkleClaim {
 }
 
 // Implement the contract structure
-#[near]
+#[near(serializers=[borsh])]
 impl MerkleClaim {
     /// Initializes the contract with the given configuration.
     #[init]
@@ -37,32 +47,35 @@ impl MerkleClaim {
 
     pub fn claim(&mut self, amount: Balance, merkle_proof: Vec<CryptoHash>) {
         let user_account_id = env::predecessor_account_id();
-
-        require!(
-            amount > 0,
-            "Amount must not be zero"
-        );
-
+        // Check claim parameters
+        require!(amount > 0, "Amount must not be zero");
         require!(
             self.claims.contains(&user_account_id) == false,
             "Already claimed rewards"
         );
-
+        require!(merkle_proof.len() > 0, "Merkle proof supplied is empty");
         require!(
-            merkle_proof.len() > 0,
-            "Merkle proof supplied is empty"
-        );
-
-        require!(
-            env::block_timestamp() <self.config.claim_end.into(),
+            env::block_timestamp() < self.config.claim_end.into(),
             "Claim period has concluded"
         );
 
         // Calculate leaf to be checked alongside provided proof
-        //      verify_proof(leaf, merkle_proof, merkle_root)
-        //
+        let data = MerkleTreeData {
+            account: user_account_id.to_string(),
+            amount: amount,
+        };
+
+        let serialized_data: Vec<u8> = borsh::to_vec(&data).expect("Failed to serialize data");
+        let leaf = env::keccak256_array(&serialized_data);
+
+        require!(
+            Self::verify_proof(leaf, merkle_proof, self.config.merkle_root),
+            "Invalid Proof"
+        );
+
         // Mark as claimed and send NEAR to account
-        self.claims.insert(user_account_id);
+        self.claims.insert(env::predecessor_account_id());
+        Promise::new(env::predecessor_account_id()).transfer(NearToken::from_near(amount));
     }
 
     pub fn withdraw(&mut self) {
