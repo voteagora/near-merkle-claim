@@ -75,7 +75,7 @@ impl MerkleClaim {
 
         // Mark as claimed and send NEAR to account
         self.claims.insert(env::predecessor_account_id());
-        Promise::new(env::predecessor_account_id()).transfer(NearToken::from_near(amount));
+        Promise::new(env::predecessor_account_id()).transfer(NearToken::from_yoctonear(amount));
     }
 
     pub fn withdraw(&mut self) {
