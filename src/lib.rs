@@ -4,8 +4,8 @@ mod merkle;
 use crate::config::Config;
 use near_sdk::store::LookupSet;
 use near_sdk::{
-    borsh, env, log, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken,
-    PanicOnDefault, Promise,
+    borsh, env, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken, PanicOnDefault,
+    Promise,
 };
 
 /// Raw type for balance in yocto NEAR.
@@ -45,10 +45,10 @@ impl MerkleClaim {
         }
     }
 
-    pub fn claim(&mut self, amount: Balance, merkle_proof: Vec<CryptoHash>) {
+    pub fn claim(&mut self, amount: near_sdk::json_types::U128, merkle_proof: Vec<CryptoHash>) {
         let user_account_id = env::predecessor_account_id();
         // Check claim parameters
-        require!(amount > 0, "Amount must not be zero");
+        require!(amount.0 > 0, "Amount must not be zero");
         require!(
             self.claims.contains(&user_account_id) == false,
             "Already claimed rewards"
@@ -62,7 +62,7 @@ impl MerkleClaim {
         // Calculate leaf to be checked alongside provided proof
         let data = MerkleTreeData {
             account: user_account_id.to_string(),
-            amount: amount,
+            amount: amount.0,
         };
 
         let serialized_data: Vec<u8> = borsh::to_vec(&data).expect("Failed to serialize data");
@@ -75,7 +75,7 @@ impl MerkleClaim {
 
         // Mark as claimed and send NEAR to account
         self.claims.insert(env::predecessor_account_id());
-        Promise::new(env::predecessor_account_id()).transfer(NearToken::from_yoctonear(amount));
+        Promise::new(env::predecessor_account_id()).transfer(NearToken::from_yoctonear(amount.0));
     }
 
     pub fn withdraw(&mut self) {
