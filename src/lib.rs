@@ -4,8 +4,8 @@ mod merkle;
 use crate::config::Config;
 use near_sdk::store::LookupSet;
 use near_sdk::{
-    borsh, env, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken,
-    PanicOnDefault, Promise,
+    borsh, env, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken, PanicOnDefault,
+    Promise,
 };
 
 /// Raw type for balance in yocto NEAR.
