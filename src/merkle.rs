@@ -11,7 +11,7 @@ impl MerkleClaim {
         let mut computed_hash = leaf;
 
         for hash in merkle_proof {
-            computed_hash = keccak256_array(&Self::commutative_keccak256(&leaf, &hash));
+            computed_hash = keccak256_array(&Self::commutative_keccak256(&computed_hash, &hash));
         }
 
         merkle_root == computed_hash
