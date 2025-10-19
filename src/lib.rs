@@ -25,6 +25,7 @@ enum StorageKeys {
 #[near(serializers=[borsh])]
 struct MerkleTreeData {
     account: String,
+    lockup: String,
     amount: Balance,
 }
 
@@ -95,6 +96,7 @@ impl MerkleClaim {
         amount: near_sdk::json_types::U128,
         merkle_proof: Vec<CryptoHash>,
         campaign_id: CampaignId,
+        lockup_contract: AccountId,
     ) {
         let user_account_id = env::predecessor_account_id();
         // Check claim parameters
@@ -119,6 +121,7 @@ impl MerkleClaim {
         // Calculate leaf to be checked alongside provided proof
         let data = MerkleTreeData {
             account: user_account_id.to_string(),
+            lockup: lockup_contract.to_string(),
             amount: amount.0,
         };
 
@@ -133,7 +136,7 @@ impl MerkleClaim {
         // Mark as claimed and send NEAR to account
         self.claims
             .insert(campaign_id, env::predecessor_account_id());
-        Promise::new(env::predecessor_account_id()).transfer(NearToken::from_yoctonear(amount.0));
+        Promise::new(lockup_contract).transfer(NearToken::from_yoctonear(amount.0));
     }
 
     pub fn withdraw(&mut self) {
@@ -148,24 +151,3 @@ impl MerkleClaim {
         Promise::new(caller).transfer(env::account_balance());
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn get_default_greeting() {
-        let contract = Contract::default();
-        // this test did not call set_greeting so should return the default "Hello" greeting
-        assert_eq!(contract.get_greeting(), "Hello");
-    }
-
-    #[test]
-    fn set_then_get_greeting() {
-        let mut contract = Contract::default();
-        contract.set_greeting("howdy".to_string());
-        assert_eq!(contract.get_greeting(), "howdy");
-    }
-}
-*/
