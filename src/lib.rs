@@ -3,7 +3,7 @@ mod merkle;
 
 use crate::config::Config;
 use near_sdk::json_types::U64;
-use near_sdk::store::LookupMap;
+use near_sdk::store::{LookupMap, LookupSet};
 use near_sdk::{
     borsh, env, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken, PanicOnDefault,
     Promise,
@@ -46,8 +46,9 @@ struct RewardCampaign {
 #[near(contract_state)]
 pub struct MerkleClaim {
     config: Config,
-    /// A map of accounts who have claimed or have yet to claim their NEAR rewards
-    claims: LookupMap<CampaignId, AccountId>,
+    /// A set of accounts who have claimed or have yet to claim their NEAR rewards where the key is
+    /// a hash of the campaign_id & account_id
+    claims: LookupSet<CryptoHash>,
     /// A map all the reward campaings
     campaigns: LookupMap<CampaignId, RewardCampaign>,
     /// The last campaign_id generated
@@ -62,7 +63,7 @@ impl MerkleClaim {
     pub fn new(config: Config) -> Self {
         Self {
             config,
-            claims: LookupMap::new(StorageKeys::Claims),
+            claims: LookupSet::new(StorageKeys::Claims),
             campaigns: LookupMap::new(StorageKeys::Campaigns),
             last_campaign_id: 0,
         }
@@ -99,16 +100,22 @@ impl MerkleClaim {
         lockup_contract: AccountId,
     ) {
         let user_account_id = env::predecessor_account_id();
+        let key = env::keccak256_array(
+            &[
+                user_account_id.as_bytes().to_vec(),
+                campaign_id.to_ne_bytes().to_vec(),
+            ]
+            .concat(),
+        );
+
         // Check claim parameters
         require!(amount.0 > 0, "Amount must not be zero");
         require!(
             self.campaigns.contains_key(&campaign_id) == true,
             "Campaign does not exist"
         );
-        require!(
-            self.claims.get(&campaign_id) != None,
-            "Already claimed rewards"
-        );
+        require!(!self.claims.contains(&key), "Already claimed rewards");
+
         require!(merkle_proof.len() > 0, "Merkle proof supplied is empty");
 
         let selected_campaign = self.campaigns.get(&campaign_id).unwrap();
@@ -134,8 +141,7 @@ impl MerkleClaim {
         );
 
         // Mark as claimed and send NEAR to account
-        self.claims
-            .insert(campaign_id, env::predecessor_account_id());
+        self.claims.insert(key);
         Promise::new(lockup_contract).transfer(NearToken::from_yoctonear(amount.0));
     }
 
