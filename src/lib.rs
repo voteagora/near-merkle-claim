@@ -1,6 +1,5 @@
 mod config;
 mod merkle;
-mod storage;
 
 use crate::config::Config;
 use near_sdk::json_types::U64;
@@ -61,6 +60,21 @@ impl MerkleClaim {
     /// Initializes the contract with the given configuration.
     #[init]
     pub fn new(config: Config) -> Self {
+        let amount = env::attached_deposit();
+
+        let min_balance = config.min_storage_deposit;
+
+        if amount < min_balance {
+            env::panic_str("The attached deposit is less than the minimum storage balance");
+        }
+
+        // Send more than the min deposit back to the owner
+        let refund = amount.saturating_sub(min_balance);
+
+        if refund > NearToken::from_near(0) {
+            Promise::new(env::predecessor_account_id()).transfer(refund);
+        }
+
         Self {
             config,
             claims: LookupMap::new(StorageKeys::Claims),
