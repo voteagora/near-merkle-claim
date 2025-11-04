@@ -60,6 +60,21 @@ impl MerkleClaim {
     /// Initializes the contract with the given configuration.
     #[init]
     pub fn new(config: Config) -> Self {
+        let amount = env::attached_deposit();
+
+        let min_balance = config.min_storage_deposit;
+
+        if amount < min_balance {
+            env::panic_str("The attached deposit is less than the minimum storage balance");
+        }
+
+        // Send more than the min deposit back to the owner
+        let refund = amount.saturating_sub(min_balance);
+
+        if refund > NearToken::from_near(0) {
+            Promise::new(env::predecessor_account_id()).transfer(refund);
+        }
+
         Self {
             config,
             claims: LookupMap::new(StorageKeys::Claims),
@@ -68,11 +83,16 @@ impl MerkleClaim {
         }
     }
 
-    pub fn create_campaign(&mut self, merkle_root: CryptoHash, claim_end: U64) {
+    pub fn assert_owner(&self) {
         require!(
             env::predecessor_account_id() == self.config.owner_account_id,
-            "Account must be the owner"
+            "Only the owner can call this method"
         );
+    }
+
+    pub fn create_campaign(&mut self, merkle_root: CryptoHash, claim_end: U64) {
+        self.assert_owner();
+
         require!(
             env::block_timestamp() < claim_end.into(),
             "Claim end timestamp must be some time in the future"
@@ -140,14 +160,14 @@ impl MerkleClaim {
     }
 
     pub fn withdraw(&mut self) {
-        let caller = env::predecessor_account_id();
+        self.assert_owner();
+        let available_balance =
+            env::account_balance().saturating_sub(self.config.min_storage_deposit);
 
-        require!(
-            caller == self.config.owner_account_id,
-            "Caller must be the owner of the claims contract"
-        );
-
-        // Send total balance to the owner
-        Promise::new(caller).transfer(env::account_balance());
+        if available_balance > NearToken::from_near(0) {
+            Promise::new(env::predecessor_account_id()).transfer(available_balance);
+        } else {
+            env::panic_str("The remaining balance is required for contract storage");
+        }
     }
 }
