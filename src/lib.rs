@@ -31,16 +31,17 @@ struct MerkleTreeData {
     amount: Balance,
 }
 
-#[near(serializers=[borsh])]
-struct RewardCampaign {
+#[derive(Clone)]
+#[near(serializers=[borsh,json])]
+pub struct RewardCampaign {
     /// The unique identifier of the campaign, this is generated automatically.
-    id: CampaignId,
+    pub id: CampaignId,
     /// The timestamp that starts the claim period, this is generated automatically
-    claim_start: U64,
+    pub claim_start: U64,
     /// The timestamp for when the claim period has concluded
-    claim_end: U64,
+    pub claim_end: U64,
     /// The merkle root of the tree containing the rewards for each account_id
-    merkle_root: CryptoHash,
+    pub merkle_root: CryptoHash,
 }
 
 // Define the contract structure
@@ -228,5 +229,25 @@ impl MerkleClaim {
         } else {
             env::panic_str("The remaining balance is required for contract storage");
         }
+    }
+
+    pub fn get_campaign(&self, campaign_id: CampaignId) -> Option<RewardCampaign> {
+        self.campaigns.get(&campaign_id).cloned()
+    }
+
+    pub fn has_claimed(&self, campaign_id: CampaignId, account_id: AccountId) -> bool {
+        let key = env::keccak256_array(
+            &[
+                account_id.as_bytes().to_vec(),
+                campaign_id.to_ne_bytes().to_vec(),
+            ]
+            .concat(),
+        );
+
+        self.claims.contains(&key)
+    }
+
+    pub fn get_last_campaign_id(&self) -> CampaignId {
+        self.last_campaign_id
     }
 }
