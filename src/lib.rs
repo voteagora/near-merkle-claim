@@ -109,7 +109,10 @@ impl MerkleClaim {
         };
 
         self.campaigns.insert(campaign_id, campaign.into());
-        self.last_campaign_id += 1;
+        self.last_campaign_id = self
+            .last_campaign_id
+            .checked_add(1)
+            .expect("Campaign id value overflows");
     }
 
     pub fn claim(
