@@ -5,9 +5,11 @@ use crate::config::Config;
 use near_sdk::json_types::U64;
 use near_sdk::store::{LookupMap, LookupSet};
 use near_sdk::{
-    borsh, env, near, require, AccountId, BorshStorageKey, CryptoHash, NearToken, PanicOnDefault,
-    Promise,
+    borsh, env, near, require, serde_json, AccountId, BorshStorageKey, CryptoHash, NearToken,
+    PanicOnDefault, Promise,
 };
+
+use near_sdk::serde::Serialize;
 
 /// Raw type for balance in yocto NEAR.
 pub type Balance = u128;
@@ -53,6 +55,30 @@ pub struct MerkleClaim {
     campaigns: LookupMap<CampaignId, RewardCampaign>,
     /// The last campaign_id generated
     last_campaign_id: CampaignId,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct CampaignCreatedEvent {
+    pub campaign_id: CampaignId,
+    pub merkle_root: CryptoHash,
+    pub claim_end: U64,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct ClaimEvent {
+    pub campaign_id: CampaignId,
+    pub account_id: AccountId,
+    pub lockup_contract: AccountId,
+    pub amount: Balance,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct WithdrawEvent {
+    pub balance: NearToken,
+    pub withdrawn: NearToken,
 }
 
 // Implement the contract structure
@@ -113,6 +139,14 @@ impl MerkleClaim {
             .last_campaign_id
             .checked_add(1)
             .expect("Campaign id value overflows");
+
+        let create = CampaignCreatedEvent {
+            campaign_id,
+            merkle_root,
+            claim_end,
+        };
+
+        env::log_str(&serde_json::to_string(&create).unwrap());
     }
 
     pub fn claim(
@@ -165,7 +199,16 @@ impl MerkleClaim {
 
         // Mark as claimed and send NEAR to account
         self.claims.insert(key);
-        Promise::new(lockup_contract).transfer(NearToken::from_yoctonear(amount.0));
+        Promise::new(lockup_contract.clone()).transfer(NearToken::from_yoctonear(amount.0));
+
+        let claim = ClaimEvent {
+            campaign_id,
+            account_id: user_account_id,
+            lockup_contract,
+            amount: amount.0,
+        };
+
+        env::log_str(&serde_json::to_string(&claim).unwrap());
     }
 
     pub fn withdraw(&mut self) {
@@ -175,6 +218,13 @@ impl MerkleClaim {
 
         if available_balance > NearToken::from_near(0) {
             Promise::new(env::predecessor_account_id()).transfer(available_balance);
+
+            let withdraw = WithdrawEvent {
+                balance: env::account_balance(),
+                withdrawn: available_balance,
+            };
+
+            env::log_str(&serde_json::to_string(&withdraw).unwrap());
         } else {
             env::panic_str("The remaining balance is required for contract storage");
         }
