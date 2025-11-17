@@ -251,3 +251,69 @@ impl MerkleClaim {
         self.last_campaign_id
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests {
+    use near_sdk::{json_types, testing_env, AccountId, NearToken, VMContext};
+    use std::convert::TryInto;
+    use std::str::FromStr;
+    use test_utils::*;
+
+    use super::*;
+
+    mod test_utils;
+
+    const MIN_STORAGE_DEPOSIT: NearToken = NearToken::from_yoctonear(1000);
+
+    fn basic_context() -> VMContext {
+        get_context(system_account(), 0, to_ts(GENESIS_TIME_IN_DAYS))
+    }
+
+    fn claims_contract_setup() -> (VMContext, MerkleClaim) {
+        let context = basic_context();
+        testing_env!(context.clone());
+
+        let config = Config {
+            owner_account_id: account_owner(),
+            min_storage_deposit: MIN_STORAGE_DEPOSIT,
+        };
+
+        let contract = MerkleClaim::new(config);
+
+        (context, contract)
+    }
+
+    #[test]
+    fn test_campaign_creation_success() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        let data = MerkleTreeData {
+            account: account_owner().to_string(),
+            lockup: system_account().to_string(),
+            amount: 0,
+        };
+
+        let serialized_data: Vec<u8> = borsh::to_vec(&data).expect("Failed to serialize data");
+        let root = env::keccak256_array(&serialized_data);
+        let end = json_types::U64(to_ts(GENESIS_TIME_IN_DAYS + 30u64));
+        let campaign_id = 1u32;
+
+        contract.create_campaign(root, end);
+
+        let current_campaign = contract.get_campaign(campaign_id).unwrap();
+
+        assert_eq!(current_campaign.id, campaign_id);
+        assert_eq!(current_campaign.merkle_root, root);
+        assert_eq!(
+            current_campaign.claim_start,
+            json_types::U64(to_ts(GENESIS_TIME_IN_DAYS))
+        );
+        assert_eq!(current_campaign.claim_end, end);
+    }
+}
