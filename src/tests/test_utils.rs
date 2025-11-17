@@ -2,6 +2,7 @@ use near_sdk::{AccountId, Gas, NearToken, PublicKey, VMContext};
 use std::str::FromStr;
 
 pub const GENESIS_TIME_IN_DAYS: u64 = 500;
+pub const DEFAULT_BALANCE_YOCTO: u128 = 20000;
 
 pub fn system_account() -> AccountId {
     AccountId::from_str("system_account").unwrap()
@@ -13,6 +14,10 @@ pub fn account_owner() -> AccountId {
 
 pub fn non_owner() -> AccountId {
     AccountId::from_str("non_owner").unwrap()
+}
+
+pub fn claimant() -> AccountId {
+    AccountId::from_str("claimant").unwrap()
 }
 
 pub fn to_yocto(near_balance: u128) -> u128 {
@@ -42,8 +47,8 @@ pub fn get_context(
         block_index: 1,
         block_timestamp,
         epoch_height: 1,
-        account_balance: NearToken::from_yoctonear(20000),
-        account_locked_balance: NearToken::from_yoctonear(20000),
+        account_balance: NearToken::from_yoctonear(DEFAULT_BALANCE_YOCTO),
+        account_locked_balance: NearToken::from_yoctonear(DEFAULT_BALANCE_YOCTO),
         storage_usage: 10u64.pow(6),
         attached_deposit: NearToken::from_yoctonear(1000),
         prepaid_gas: Gas::from_gas(10u64.pow(15)),
