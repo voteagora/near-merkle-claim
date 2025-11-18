@@ -23,9 +23,9 @@ echo "Creating account $CLAIMS_ACCOUNT_ID"
 near --quiet account create-account fund-myself $CLAIMS_ACCOUNT_ID '1.0 NEAR' autogenerate-new-keypair save-to-keychain sign-as $ROOT_ACCOUNT_ID network-config $CHAIN_ID sign-with-keychain send
 
 echo "Deploying and initializing Rewards contract"
-near --quiet contract deploy $CLAIMS_ACCOUNT_ID use-file $TARGET with-init-call new json-args '{
+near contract deploy $CLAIMS_ACCOUNT_ID use-file $TARGET with-init-call new json-args '{
   "config": {
     "owner_account_id": "'$ROOT_ACCOUNT_ID'",
-    "min_storage_deposit": "'$MIN_STORAGE_DEPOSIT'",
+    "min_storage_deposit": "'$MIN_STORAGE_DEPOSIT'"
   }
-}' prepaid-gas '10.0 Tgas' attached-deposit "'$STORAGE_DEPOSIT'" network-config $CHAIN_ID sign-with-keychain send
+}' prepaid-gas '10.0 Tgas' attached-deposit "$STORAGE_DEPOSIT" network-config $CHAIN_ID sign-with-keychain send

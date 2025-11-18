@@ -87,6 +87,7 @@ pub struct WithdrawEvent {
 impl MerkleClaim {
     /// Initializes the contract with the given configuration.
     #[init]
+    #[payable]
     pub fn new(config: Config) -> Self {
         let amount = env::attached_deposit();
 
