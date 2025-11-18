@@ -20,10 +20,6 @@ pub fn claimant() -> AccountId {
     AccountId::from_str("claimant").unwrap()
 }
 
-pub fn to_yocto(near_balance: u128) -> u128 {
-    near_balance * 10u128.pow(24)
-}
-
 pub fn to_nanos(num_days: u64) -> u64 {
     num_days * 86400_000_000_000
 }
@@ -33,11 +29,7 @@ pub fn to_ts(num_days: u64) -> u64 {
     1533081600_000_000_000 + to_nanos(num_days)
 }
 
-pub fn get_context(
-    predecessor_account_id: AccountId,
-    account_balance: u128,
-    block_timestamp: u64,
-) -> VMContext {
+pub fn get_context(predecessor_account_id: AccountId, block_timestamp: u64) -> VMContext {
     VMContext {
         current_account_id: account_owner(),
         signer_account_id: predecessor_account_id.clone(),
