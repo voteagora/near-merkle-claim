@@ -12,15 +12,15 @@ if [ -z "$ROOT_ACCOUNT_ID" ]; then
 fi
 
 : "${CHAIN_ID:=mainnet}"
-: ${STORAGE_DEPOSIT:="0.1 NEAR"}
+: ${STORAGE_DEPOSIT:="1 NEAR"}
 # 0.1 NEAR (enough for 10000 bytes)
 : ${MIN_STORAGE_DEPOSIT:="100000000000000000000000"}
 
 export ROOT_ACCOUNT_ID="$ROOT_ACCOUNT_ID"
 export CLAIMS_ACCOUNT_ID="maskc.$ROOT_ACCOUNT_ID"
 
-echo "Creating account $CLAIMS_ACCOUNT_ID"
-near --quiet account create-account fund-myself $CLAIMS_ACCOUNT_ID '1.0 NEAR' autogenerate-new-keypair save-to-keychain sign-as $ROOT_ACCOUNT_ID network-config $CHAIN_ID sign-with-keychain send
+#echo "Creating account $CLAIMS_ACCOUNT_ID"
+near --quiet account create-account fund-myself $CLAIMS_ACCOUNT_ID '5.0 NEAR' autogenerate-new-keypair save-to-keychain sign-as $ROOT_ACCOUNT_ID network-config $CHAIN_ID sign-with-keychain send
 
 echo "Deploying and initializing Rewards contract"
 near contract deploy $CLAIMS_ACCOUNT_ID use-file $TARGET with-init-call new json-args '{
