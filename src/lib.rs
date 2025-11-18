@@ -251,3 +251,112 @@ impl MerkleClaim {
         self.last_campaign_id
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests {
+    use near_sdk::{json_types, testing_env, AccountId, NearToken, VMContext};
+    use std::convert::TryInto;
+    use std::str::FromStr;
+    use test_utils::*;
+
+    use super::*;
+
+    mod test_utils;
+
+    const MIN_STORAGE_DEPOSIT: NearToken = NearToken::from_yoctonear(1000);
+
+    fn basic_context() -> VMContext {
+        get_context(system_account(), 0, to_ts(GENESIS_TIME_IN_DAYS))
+    }
+
+    fn claims_contract_setup() -> (VMContext, MerkleClaim) {
+        let context = basic_context();
+        testing_env!(context.clone());
+
+        let config = Config {
+            owner_account_id: account_owner(),
+            min_storage_deposit: MIN_STORAGE_DEPOSIT,
+        };
+
+        let contract = MerkleClaim::new(config);
+
+        (context, contract)
+    }
+
+    fn build_mock_campaign() -> (u32, CryptoHash, U64) {
+        let data = MerkleTreeData {
+            account: account_owner().to_string(),
+            lockup: system_account().to_string(),
+            amount: 0,
+        };
+
+        let serialized_data: Vec<u8> = borsh::to_vec(&data).expect("Failed to serialize data");
+        let root = env::keccak256_array(&serialized_data);
+        let end = json_types::U64(to_ts(GENESIS_TIME_IN_DAYS + 30u64));
+        let campaign_id = 1u32;
+
+        (campaign_id, root, end)
+    }
+
+    #[test]
+    fn test_campaign_creation_success() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        let data = MerkleTreeData {
+            account: account_owner().to_string(),
+            lockup: system_account().to_string(),
+            amount: 0,
+        };
+
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+
+        let current_campaign = contract.get_campaign(mock_campaign.0).unwrap();
+
+        assert_eq!(current_campaign.id, mock_campaign.0);
+        assert_eq!(current_campaign.merkle_root, mock_campaign.1);
+        assert_eq!(
+            current_campaign.claim_start,
+            json_types::U64(to_ts(GENESIS_TIME_IN_DAYS))
+        );
+        assert_eq!(current_campaign.claim_end, mock_campaign.2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Only the owner can call this method")]
+    fn test_campaign_creation_failure_non_owner() {
+        let (mut context, mut contract) = claims_contract_setup();
+        context.predecessor_account_id = non_owner();
+        context.signer_account_id = non_owner();
+        context.signer_account_pk = public_key(2).try_into().unwrap();
+        context.attached_deposit = NearToken::from_yoctonear(1);
+
+        testing_env!(context.clone());
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Claim end timestamp must be some time in the future")]
+    fn test_campaign_creation_failure_claim_end() {
+        let (mut context, mut contract) = claims_contract_setup();
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+
+        let mock_campaign = build_mock_campaign();
+        // Change the block timestamp to be the claim end period
+        context.block_timestamp = mock_campaign.2.into();
+
+        testing_env!(context.clone());
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+    }
+}
