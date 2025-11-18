@@ -266,9 +266,19 @@ mod tests {
     mod test_utils;
 
     const MIN_STORAGE_DEPOSIT: NearToken = NearToken::from_yoctonear(1000);
+    const FAKE_MERKLE_PROOF: [[u8; 32]; 2] = [
+        [
+            94, 143, 161, 184, 186, 17, 223, 110, 197, 156, 168, 41, 145, 20, 196, 193, 228, 159,
+            17, 221, 180, 108, 13, 100, 7, 247, 235, 212, 6, 162, 245, 2,
+        ],
+        [
+            236, 8, 150, 63, 117, 228, 0, 201, 219, 131, 238, 26, 123, 68, 157, 32, 157, 222, 174,
+            86, 151, 188, 49, 178, 51, 171, 115, 173, 101, 12, 43, 15,
+        ],
+    ];
 
     fn basic_context() -> VMContext {
-        get_context(system_account(), 0, to_ts(GENESIS_TIME_IN_DAYS))
+        get_context(system_account(), to_ts(GENESIS_TIME_IN_DAYS))
     }
 
     fn claims_contract_setup() -> (VMContext, MerkleClaim) {
@@ -308,12 +318,6 @@ mod tests {
         context.signer_account_id = account_owner();
         context.signer_account_pk = public_key(1).try_into().unwrap();
         testing_env!(context.clone());
-
-        let data = MerkleTreeData {
-            account: account_owner().to_string(),
-            lockup: system_account().to_string(),
-            amount: 0,
-        };
 
         let mock_campaign = build_mock_campaign();
 
@@ -359,5 +363,159 @@ mod tests {
 
         testing_env!(context.clone());
         contract.create_campaign(mock_campaign.1, mock_campaign.2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid Proof")]
+    fn test_claim_invalid_proof() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+        let end = json_types::U64(to_ts(GENESIS_TIME_IN_DAYS + 30u64));
+
+        contract.create_campaign(
+            [
+                158, 236, 219, 170, 25, 1, 253, 172, 46, 71, 82, 30, 201, 181, 15, 59, 58, 254,
+                170, 207, 59, 87, 184, 46, 81, 28, 122, 202, 227, 92, 92, 128,
+            ],
+            end,
+        );
+
+        context.predecessor_account_id = claimant();
+        context.signer_account_id = claimant();
+        context.signer_account_pk = public_key(123).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.claim(
+            json_types::U128(1000u128),
+            FAKE_MERKLE_PROOF.to_vec(),
+            1u32,
+            AccountId::from_str("lockup-contract").unwrap(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Amount must not be zero")]
+    fn test_claim_amount_failure() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+
+        context.predecessor_account_id = claimant();
+        context.signer_account_id = claimant();
+        context.signer_account_pk = public_key(123).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.claim(
+            json_types::U128(0u128),
+            FAKE_MERKLE_PROOF.to_vec(),
+            1u32,
+            AccountId::from_str("lockup-contract").unwrap(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Campaign does not exist")]
+    fn test_claim_campaign_failure() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+
+        context.predecessor_account_id = claimant();
+        context.signer_account_id = claimant();
+        context.signer_account_pk = public_key(123).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.claim(
+            json_types::U128(1000u128),
+            FAKE_MERKLE_PROOF.to_vec(),
+            2u32,
+            AccountId::from_str("lockup-contract").unwrap(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Merkle proof supplied is empty")]
+    fn test_claim_proof_empty_failure() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+
+        context.predecessor_account_id = claimant();
+        context.signer_account_id = claimant();
+        context.signer_account_pk = public_key(123).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.claim(
+            json_types::U128(1000u128),
+            [].to_vec(),
+            1u32,
+            AccountId::from_str("lockup-contract").unwrap(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Claim period has concluded")]
+    fn test_claim_end_failure() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+
+        context.predecessor_account_id = claimant();
+        context.signer_account_id = claimant();
+        context.signer_account_pk = public_key(123).try_into().unwrap();
+        context.block_timestamp = to_ts(GENESIS_TIME_IN_DAYS + 40u64);
+        testing_env!(context.clone());
+
+        contract.claim(
+            json_types::U128(1000u128),
+            FAKE_MERKLE_PROOF.to_vec(),
+            1u32,
+            AccountId::from_str("lockup-contract").unwrap(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Only the owner can call this method")]
+    fn test_withdraw_owner_failure() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = non_owner();
+        context.signer_account_id = non_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.withdraw();
     }
 }
