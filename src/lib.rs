@@ -56,6 +56,8 @@ pub struct MerkleClaim {
     campaigns: LookupMap<CampaignId, RewardCampaign>,
     /// The last campaign_id generated
     last_campaign_id: CampaignId,
+    /// An only owner variable that pauses the contract in case of security issues
+    paused: bool,
 }
 
 #[derive(Serialize)]
@@ -109,6 +111,7 @@ impl MerkleClaim {
             claims: LookupSet::new(StorageKeys::Claims),
             campaigns: LookupMap::new(StorageKeys::Campaigns),
             last_campaign_id: 0,
+            paused: false,
         }
     }
 
@@ -119,8 +122,23 @@ impl MerkleClaim {
         );
     }
 
+    pub fn assert_unpaused(&self) {
+        require!(!self.paused, "Contract is paused");
+    }
+
+    pub fn pause(&mut self) {
+        self.assert_owner();
+        self.paused = true;
+    }
+
+    pub fn unpause(&mut self) {
+        self.assert_owner();
+        self.paused = false;
+    }
+
     pub fn create_campaign(&mut self, merkle_root: CryptoHash, claim_end: U64) {
         self.assert_owner();
+        self.assert_unpaused();
 
         require!(
             env::block_timestamp() < claim_end.into(),
@@ -158,6 +176,7 @@ impl MerkleClaim {
         campaign_id: CampaignId,
         lockup_contract: AccountId,
     ) {
+        self.assert_unpaused();
         let user_account_id = env::predecessor_account_id();
         let key = env::keccak256_array(
             &[
@@ -517,5 +536,50 @@ mod tests {
         testing_env!(context.clone());
 
         contract.withdraw();
+    }
+
+    #[test]
+    #[should_panic(expected = "Contract is paused")]
+    fn test_create_campaign_failure_paused() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.pause();
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Contract is paused")]
+    fn test_claim_failure_paused() {
+        let (mut context, mut contract) = claims_contract_setup();
+
+        context.predecessor_account_id = account_owner();
+        context.signer_account_id = account_owner();
+        context.signer_account_pk = public_key(1).try_into().unwrap();
+        testing_env!(context.clone());
+
+        contract.pause();
+        let mock_campaign = build_mock_campaign();
+
+        contract.create_campaign(mock_campaign.1, mock_campaign.2);
+
+        context.predecessor_account_id = claimant();
+        context.signer_account_id = claimant();
+        context.signer_account_pk = public_key(123).try_into().unwrap();
+        context.block_timestamp = to_ts(GENESIS_TIME_IN_DAYS + 40u64);
+        testing_env!(context.clone());
+
+        contract.claim(
+            json_types::U128(1000u128),
+            FAKE_MERKLE_PROOF.to_vec(),
+            1u32,
+            AccountId::from_str("lockup-contract").unwrap(),
+        );
     }
 }
