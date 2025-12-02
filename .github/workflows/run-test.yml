@@ -1,0 +1,8 @@
+name: Run testing / lint
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
