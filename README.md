@@ -6,7 +6,7 @@ in the merkle tree set.
 
 ## How It Works
 
-1. Owner funds the contract and supplies a merkle root, and claim end period
+1. Owner funds the contract and supplies a merkle root, and claim end period for each campaign
 2. Users(accountId) who are recipients can supply a proof along with the expected balance to the `claim` method. Once the proof is verified, NEAR is sent.
 3. After the claim period ends, the owner can then withdraw the remaining unclaimed balance.
 
@@ -31,8 +31,15 @@ cargo test
 A JSON configuration needs to be provided to initialize the contract using the `new()` method. These values cannot be changed at a later time once the contract is deployed. Furthermore, it is important that the owner / or some party funds the contract with the appropiate balance to allow users to withdraw. 
 
 `owner_account_id: AccountId` - This user can withdraw the total amount of funds once the claim period ends.
-`merkle_root: CryptoHash` - The root of the merkle tree of the set of predefined accountIds and balances.
-`claim_end: U64` - A timestamp to determine the end of the claim period. Once concluded, users in the predefined list can no longer withdraw.
+`min_storage_deposit: NearToken` - When initializing the contract ensure to deposit NEAR that exceeds this value, it is used for storage.
+
+### Creating a Campaign
+
+Once the trie has been generated the merkle root must be published along with a claim end timestamp:
+
+```
+{"merkle_root": [...], "claim_end": "1789228321000000000"}
+```
 
 Deployment is automated with GitHub Actions CI/CD pipeline.
 To deploy manually, install [`cargo-near`](https://github.com/near/cargo-near) and run:
