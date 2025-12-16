@@ -24,6 +24,19 @@ cargo near build
 cargo test
 ```
 
+### Building release candidate
+
+Check the release tags for [latest](https://github.com/voteagora/near-merkle-claim/releases/tag/v1.0.0)
+
+Before building or verifying code hashes run:
+```
+git fetch --tags
+git checkout v1.0.0
+
+cargo near build
+-> reproducible-wasm
+```
+
 ## How to Deploy?
 
 ### Configuration
@@ -53,3 +66,9 @@ If you deploy production ready smart contract:
 ```bash
 cargo near deploy build-reproducible-wasm <account-id>
 ```
+
+### On/offchain data model
+
+The merkle root for every campaign is on-chain and is only indexable through the `create_campaign` events. The proof artifacts the user supplies, as well as the
+entire merkle tree generated from the CSV is computed off-chain. A provider will obtain the data to populate the CSV with users account ids, lockup contract account,
+and total reward amount accrued. This data is indexed and assembled from the `venear.dao` contract on mainnet.
