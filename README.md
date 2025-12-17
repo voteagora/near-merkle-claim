@@ -1,14 +1,12 @@
 # near-merkle-claim
 
-This is an implementation of a Merkle claim contract that utilizes keccack256 hashes to prove balances for a given accountId. This can be used to distribute NEAR
-tokens to these respective users given a predefined list of recipients. These contracts use the accumulator pattern to show the inclusion of a given hash
-in the merkle tree set.
+This contract implements a Merkle-based claim mechanism that uses keccak256 hashes to verify an account’s allocated balance. It enables the distribution of NEAR tokens to a predefined list of recipients by allowing each user to cryptographically prove their eligibility. The contract uses an accumulator pattern to verify that a given hash is included in the Merkle tree.
 
 ## How It Works
 
-1. Owner funds the contract and supplies a merkle root, and claim end period for each campaign
-2. Users(accountId) who are recipients can supply a proof along with the expected balance to the `claim` method. Once the proof is verified, NEAR is sent.
-3. After the claim period ends, the owner can then withdraw the remaining unclaimed balance.
+1. The owner initializes each campaign by funding the contract and providing a Merkle root along with a claim end date.
+2. Eligible users (by accountId) submit a claim by calling the claim method with their Merkle proof and expected balance. If the proof is valid, the contract transfers the corresponding amount of NEAR to the user.
+3. After the claim period expires, the owner may withdraw any remaining unclaimed NEAR from the contract.
 
 ## How to Build Locally?
 
@@ -43,12 +41,12 @@ cargo near build
 
 A JSON configuration needs to be provided to initialize the contract using the `new()` method. These values cannot be changed at a later time once the contract is deployed. Furthermore, it is important that the owner / or some party funds the contract with the appropiate balance to allow users to withdraw. 
 
-`owner_account_id: AccountId` - This user can withdraw the total amount of funds once the claim period ends.
+`owner_account_id: AccountId` - This user can withdraw remaining funds once the the claim period ends.
 `min_storage_deposit: NearToken` - When initializing the contract ensure to deposit NEAR that exceeds this value, it is used for storage.
 
 ### Creating a Campaign
 
-Once the trie has been generated the merkle root must be published along with a claim end timestamp:
+Once the trie has been generated the Merkle root must be published along with a claim end timestamp:
 
 ```
 {"merkle_root": [...], "claim_end": "1789228321000000000"}
@@ -67,8 +65,8 @@ If you deploy production ready smart contract:
 cargo near deploy build-reproducible-wasm <account-id>
 ```
 
-### On/offchain data model
+### On/offchain Data Model
 
-The merkle root for every campaign is on-chain and is only indexable through the `create_campaign` events. The proof artifacts the user supplies, as well as the
-entire merkle tree generated from the CSV is computed off-chain. A provider will obtain the data to populate the CSV with users account ids, lockup contract account,
-and total reward amount accrued. This data is indexed and assembled from the `venear.dao` contract on mainnet.
+For each campaign, the Merkle root is stored on-chain and can only be discovered by indexing the `create_campaign` events. The Merkle proofs submitted by users, as well as the full Merkle tree derived from the CSV, are generated off-chain.
+
+A data provider collects the information needed to build the CSV—including user account IDs, lockup contract accounts, and total accrued rewards. This data is indexed and aggregated from the `venear.dao` contract on mainnet.
